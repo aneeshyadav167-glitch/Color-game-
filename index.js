@@ -2,19 +2,29 @@ const express = require("express");
 const TelegramBot = require("node-telegram-bot-api");
 
 const app = express();
-const bot = new TelegramBot(process.env.TOKEN);
 
-bot.setWebHook(process.env.WEBHOOK_URL);
+// 🔑 REQUIRED
+const BOT_TOKEN = "8728782119:AAEjJ8ILVExhS3WeA8M4jxs8i_mcGL2AJ-4";
+const ADMIN_ID = 6008064617;
 
-let adminId = 6008064617; // 👈 yaha apna ID daalna
+// 🌐 AUTO URL (Render se aayega)
+const URL = process.env.RENDER_EXTERNAL_URL;
 
+const bot = new TelegramBot(TOKEN);
+
+// 🔥 AUTO WEBHOOK
+if (URL) {
+  bot.setWebHook(URL);
+}
+
+// 📊 DATA
 let users = {};
 let bets = [];
+let history = [];
 let bettingOpen = false;
-let timeLeft = 0;
 let currentResult = null;
 
-// START
+// 🟢 START
 bot.onText(/\/start/, (msg) => {
   const id = msg.chat.id;
 
@@ -22,55 +32,62 @@ bot.onText(/\/start/, (msg) => {
     users[id] = { points: 1000 };
   }
 
-  bot.sendMessage(id, `Welcome 🎮\nPoints: ${users[id].points}`);
+  bot.sendMessage(id, `🎮 Welcome!\n💰 Points: ${users[id].points}`);
 });
 
-// ADMIN PANEL
+// 🔑 ADMIN PANEL
 bot.onText(/\/admin/, (msg) => {
-  if (msg.chat.id != adminId) return;
+  if (msg.chat.id != ADMIN_ID) return;
 
-  bot.sendMessage(msg.chat.id, "Admin Panel:\n/startgame\n/stats\n/setresult number color updown");
+  bot.sendMessage(
+    msg.chat.id,
+    `⚙️ Admin Panel:
+/startgame 30
+/stats
+/setresult number color updown`
+  );
 });
 
-// START GAME
+// 🎮 START GAME
 bot.onText(/\/startgame (.+)/, (msg, match) => {
-  if (msg.chat.id != adminId) return;
+  if (msg.chat.id != ADMIN_ID) return;
 
-  timeLeft = parseInt(match[1]);
-  bettingOpen = true;
+  let time = parseInt(match[1]);
   bets = [];
+  bettingOpen = true;
 
-  bot.sendMessage(msg.chat.id, `Game started for ${timeLeft}s`);
+  bot.sendMessage(msg.chat.id, `⏱️ Game started for ${time}s`);
+
+  let t = time;
 
   let interval = setInterval(() => {
-    timeLeft--;
+    t--;
 
-    if (timeLeft <= 8) {
-      bettingOpen = false;
-    }
+    if (t <= 8) bettingOpen = false;
 
-    if (timeLeft <= 0) {
+    if (t <= 0) {
       clearInterval(interval);
       endRound();
     }
   }, 1000);
 });
 
-// PLACE BET
+// 🎯 PLACE BET
 bot.on("message", (msg) => {
   const id = msg.chat.id;
+
   if (!bettingOpen) return;
 
   let choice = msg.text.toLowerCase();
 
-  bets.push({ user: id, choice, amount: 10 });
+  bets.push({ user: id, choice });
 
-  bot.sendMessage(id, `Bet placed on ${choice}`);
+  bot.sendMessage(id, `✅ Bet on: ${choice}`);
 });
 
-// SET RESULT (ADMIN)
+// 🎯 SET RESULT (ADMIN)
 bot.onText(/\/setresult (.+)/, (msg, match) => {
-  if (msg.chat.id != adminId) return;
+  if (msg.chat.id != ADMIN_ID) return;
 
   let parts = match[1].split(" ");
   currentResult = {
@@ -79,10 +96,10 @@ bot.onText(/\/setresult (.+)/, (msg, match) => {
     updown: parts[2],
   };
 
-  bot.sendMessage(msg.chat.id, "Result set manually");
+  bot.sendMessage(msg.chat.id, "⚠️ Manual result set");
 });
 
-// END ROUND
+// 🧠 END ROUND
 function endRound() {
   let result;
 
@@ -98,6 +115,7 @@ function endRound() {
     };
   }
 
+  // 💰 CALCULATE
   bets.forEach((b) => {
     if (!users[b.user]) return;
 
@@ -107,14 +125,30 @@ function endRound() {
     else users[b.user].points -= 10;
   });
 
-  bot.sendMessage(adminId, `Result: ${JSON.stringify(result)}`);
+  // 📊 HISTORY
+  history.unshift(result);
+  history = history.slice(0, 10);
+
+  // 📢 RESULT SEND
+  Object.keys(users).forEach((uid) => {
+    bot.sendMessage(
+      uid,
+      `🎯 Result:
+Number: ${result.number}
+Color: ${result.color}
+Up/Down: ${result.updown}
+
+💰 Points: ${users[uid].points}`
+    );
+  });
 }
 
-// STATS
+// 📊 STATS
 bot.onText(/\/stats/, (msg) => {
-  if (msg.chat.id != adminId) return;
+  if (msg.chat.id != ADMIN_ID) return;
 
   let stats = {};
+
   bets.forEach((b) => {
     stats[b.choice] = (stats[b.choice] || 0) + 1;
   });
@@ -122,13 +156,19 @@ bot.onText(/\/stats/, (msg) => {
   bot.sendMessage(msg.chat.id, JSON.stringify(stats, null, 2));
 });
 
-// SERVER
+// 🌐 SERVER
 app.use(express.json());
+
 app.post("/", (req, res) => {
   bot.processUpdate(req.body);
   res.sendStatus(200);
 });
 
-app.get("/", (req, res) => res.send("Bot Running"));
+app.get("/", (req, res) => res.send("Bot Running ✅"));
 
-app.listen(3000);
+// 🔥 FIXED PORT (IMPORTANT)
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log("Server running on port " + PORT);
+});
