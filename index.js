@@ -3,23 +3,16 @@ const TelegramBot = require("node-telegram-bot-api");
 
 const app = express();
 
-// 🔑 IMPORTANT (FILL THESE)
+// 🔑 YOUR DATA (already added)
 const TOKEN = "8728782119:AAEjJ8ILVExhS3WeA8M4jxs8i_mcGL2AJ-4";
 const ADMIN_ID = 6008064617;
 
-// ❗ Safety check
-if (!TOKEN || TOKEN === "PASTE_YOUR_TOKEN_HERE") {
-  console.log("❌ TOKEN missing");
-  process.exit(1);
-}
-
-// 🌐 URL (Render auto)
+// 🌐 URL auto
 const URL = process.env.RENDER_EXTERNAL_URL || "";
 
-// ✅ Bot init (SAFE)
 const bot = new TelegramBot(TOKEN);
 
-// 🔥 Webhook only if URL exists
+// 🔥 webhook auto
 if (URL) {
   bot.setWebHook(URL);
 }
@@ -38,30 +31,84 @@ bot.onText(/\/start/, (msg) => {
     users[id] = { points: 1000 };
   }
 
-  bot.sendMessage(id, `🎮 Welcome\n💰 Points: ${users[id].points}`);
+  bot.sendMessage(id, `🎮 Welcome!\n💰 Points: ${users[id].points}`);
 });
 
-// 🔑 ADMIN
+// 🔑 ADMIN PANEL
 bot.onText(/\/admin/, (msg) => {
   if (msg.chat.id != ADMIN_ID) return;
 
-  bot.sendMessage(msg.chat.id, `⚙️ Admin:
-/startgame 30
-/stats
-/setresult 8 red up`);
+  bot.sendMessage(
+    msg.chat.id,
+    `⚙️ Admin:
+/startgame 30sec
+/startgame 1min
+/startgame 5min
+/startgame 30min
+
+/setresult 8 red up
+/stats`
+  );
 });
 
-// 🎮 START GAME
+// 🎮 START GAME + UI
 bot.onText(/\/startgame (.+)/, (msg, match) => {
   if (msg.chat.id != ADMIN_ID) return;
 
-  let time = parseInt(match[1]);
+  let input = match[1].toLowerCase().trim();
+
+  let timeMap = {
+    "30sec": 30,
+    "1min": 60,
+    "5min": 300,
+    "30min": 1800
+  };
+
+  if (!timeMap[input]) {
+    bot.sendMessage(msg.chat.id, "❌ Invalid type");
+    return;
+  }
+
   bets = [];
   bettingOpen = true;
 
-  bot.sendMessage(msg.chat.id, `⏱️ Game started: ${time}s`);
+  let keyboard = {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: "🔴 Red", callback_data: "red" },
+          { text: "🔵 Blue", callback_data: "blue" },
+          { text: "🟡 Yellow", callback_data: "yellow" }
+        ],
+        [
+          { text: "0", callback_data: "0" },
+          { text: "1", callback_data: "1" },
+          { text: "2", callback_data: "2" }
+        ],
+        [
+          { text: "3", callback_data: "3" },
+          { text: "4", callback_data: "4" },
+          { text: "5", callback_data: "5" }
+        ],
+        [
+          { text: "6", callback_data: "6" },
+          { text: "7", callback_data: "7" },
+          { text: "8", callback_data: "8" }
+        ],
+        [
+          { text: "9", callback_data: "9" }
+        ],
+        [
+          { text: "⬆️ Up", callback_data: "up" },
+          { text: "⬇️ Down", callback_data: "down" }
+        ]
+      ]
+    }
+  };
 
-  let t = time;
+  bot.sendMessage(msg.chat.id, `🎮 ${input} Round Started!\nChoose your bet 👇`, keyboard);
+
+  let t = timeMap[input];
 
   let interval = setInterval(() => {
     t--;
@@ -75,16 +122,21 @@ bot.onText(/\/startgame (.+)/, (msg, match) => {
   }, 1000);
 });
 
-// 🎯 BET
-bot.on("message", (msg) => {
-  if (!bettingOpen) return;
+// 🎯 BUTTON BET
+bot.on("callback_query", (query) => {
+  let choice = query.data;
+  let userId = query.message.chat.id;
 
-  let id = msg.chat.id;
-  let choice = msg.text?.toLowerCase();
+  if (!bettingOpen) {
+    bot.answerCallbackQuery(query.id, { text: "⛔ Betting closed!" });
+    return;
+  }
 
-  bets.push({ user: id, choice });
+  bets.push({ user: userId, choice });
 
-  bot.sendMessage(id, `✅ Bet: ${choice}`);
+  bot.answerCallbackQuery(query.id, {
+    text: `✅ Bet on ${choice}`
+  });
 });
 
 // 🎯 MANUAL RESULT
@@ -159,9 +211,7 @@ app.post("/", (req, res) => {
   res.sendStatus(200);
 });
 
-app.get("/", (req, res) => {
-  res.send("Bot Running ✅");
-});
+app.get("/", (req, res) => res.send("Bot Running ✅"));
 
 // 🔥 PORT FIX
 const PORT = process.env.PORT || 3000;
