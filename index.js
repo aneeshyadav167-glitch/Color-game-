@@ -6,7 +6,7 @@ const bot = new TelegramBot(process.env.TOKEN);
 
 bot.setWebHook(process.env.WEBHOOK_URL);
 
-let adminId = 123456789; // 👈 yaha apna ID daalna
+let adminId = 6008064617; // 👈 yaha apna ID daalna
 
 let users = {};
 let bets = [];
