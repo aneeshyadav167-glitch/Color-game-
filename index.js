@@ -3,16 +3,23 @@ const TelegramBot = require("node-telegram-bot-api");
 
 const app = express();
 
-// 🔑 REQUIRED
-const BOT_TOKEN = "8728782119:AAEjJ8ILVExhS3WeA8M4jxs8i_mcGL2AJ-4";
+// 🔑 IMPORTANT (FILL THESE)
+const TOKEN = "8728782119:AAEjJ8ILVExhS3WeA8M4jxs8i_mcGL2AJ-4";
 const ADMIN_ID = 6008064617;
 
-// 🌐 AUTO URL (Render se aayega)
-const URL = process.env.RENDER_EXTERNAL_URL;
+// ❗ Safety check
+if (!TOKEN || TOKEN === "PASTE_YOUR_TOKEN_HERE") {
+  console.log("❌ TOKEN missing");
+  process.exit(1);
+}
 
+// 🌐 URL (Render auto)
+const URL = process.env.RENDER_EXTERNAL_URL || "";
+
+// ✅ Bot init (SAFE)
 const bot = new TelegramBot(TOKEN);
 
-// 🔥 AUTO WEBHOOK
+// 🔥 Webhook only if URL exists
 if (URL) {
   bot.setWebHook(URL);
 }
@@ -20,7 +27,6 @@ if (URL) {
 // 📊 DATA
 let users = {};
 let bets = [];
-let history = [];
 let bettingOpen = false;
 let currentResult = null;
 
@@ -32,20 +38,17 @@ bot.onText(/\/start/, (msg) => {
     users[id] = { points: 1000 };
   }
 
-  bot.sendMessage(id, `🎮 Welcome!\n💰 Points: ${users[id].points}`);
+  bot.sendMessage(id, `🎮 Welcome\n💰 Points: ${users[id].points}`);
 });
 
-// 🔑 ADMIN PANEL
+// 🔑 ADMIN
 bot.onText(/\/admin/, (msg) => {
   if (msg.chat.id != ADMIN_ID) return;
 
-  bot.sendMessage(
-    msg.chat.id,
-    `⚙️ Admin Panel:
+  bot.sendMessage(msg.chat.id, `⚙️ Admin:
 /startgame 30
 /stats
-/setresult number color updown`
-  );
+/setresult 8 red up`);
 });
 
 // 🎮 START GAME
@@ -56,7 +59,7 @@ bot.onText(/\/startgame (.+)/, (msg, match) => {
   bets = [];
   bettingOpen = true;
 
-  bot.sendMessage(msg.chat.id, `⏱️ Game started for ${time}s`);
+  bot.sendMessage(msg.chat.id, `⏱️ Game started: ${time}s`);
 
   let t = time;
 
@@ -72,28 +75,27 @@ bot.onText(/\/startgame (.+)/, (msg, match) => {
   }, 1000);
 });
 
-// 🎯 PLACE BET
+// 🎯 BET
 bot.on("message", (msg) => {
-  const id = msg.chat.id;
-
   if (!bettingOpen) return;
 
-  let choice = msg.text.toLowerCase();
+  let id = msg.chat.id;
+  let choice = msg.text?.toLowerCase();
 
   bets.push({ user: id, choice });
 
-  bot.sendMessage(id, `✅ Bet on: ${choice}`);
+  bot.sendMessage(id, `✅ Bet: ${choice}`);
 });
 
-// 🎯 SET RESULT (ADMIN)
+// 🎯 MANUAL RESULT
 bot.onText(/\/setresult (.+)/, (msg, match) => {
   if (msg.chat.id != ADMIN_ID) return;
 
-  let parts = match[1].split(" ");
+  let p = match[1].split(" ");
   currentResult = {
-    number: parts[0],
-    color: parts[1],
-    updown: parts[2],
+    number: p[0],
+    color: p[1],
+    updown: p[2],
   };
 
   bot.sendMessage(msg.chat.id, "⚠️ Manual result set");
@@ -107,15 +109,14 @@ function endRound() {
     result = currentResult;
     currentResult = null;
   } else {
-    let num = Math.floor(Math.random() * 10);
+    let n = Math.floor(Math.random() * 10);
     result = {
-      number: num.toString(),
-      color: num % 3 == 0 ? "red" : num % 3 == 1 ? "blue" : "yellow",
-      updown: num >= 5 ? "up" : "down",
+      number: n.toString(),
+      color: n % 3 == 0 ? "red" : n % 3 == 1 ? "blue" : "yellow",
+      updown: n >= 5 ? "up" : "down",
     };
   }
 
-  // 💰 CALCULATE
   bets.forEach((b) => {
     if (!users[b.user]) return;
 
@@ -125,11 +126,6 @@ function endRound() {
     else users[b.user].points -= 10;
   });
 
-  // 📊 HISTORY
-  history.unshift(result);
-  history = history.slice(0, 10);
-
-  // 📢 RESULT SEND
   Object.keys(users).forEach((uid) => {
     bot.sendMessage(
       uid,
@@ -147,13 +143,12 @@ Up/Down: ${result.updown}
 bot.onText(/\/stats/, (msg) => {
   if (msg.chat.id != ADMIN_ID) return;
 
-  let stats = {};
-
+  let s = {};
   bets.forEach((b) => {
-    stats[b.choice] = (stats[b.choice] || 0) + 1;
+    s[b.choice] = (s[b.choice] || 0) + 1;
   });
 
-  bot.sendMessage(msg.chat.id, JSON.stringify(stats, null, 2));
+  bot.sendMessage(msg.chat.id, JSON.stringify(s, null, 2));
 });
 
 // 🌐 SERVER
@@ -164,11 +159,13 @@ app.post("/", (req, res) => {
   res.sendStatus(200);
 });
 
-app.get("/", (req, res) => res.send("Bot Running ✅"));
+app.get("/", (req, res) => {
+  res.send("Bot Running ✅");
+});
 
-// 🔥 FIXED PORT (IMPORTANT)
+// 🔥 PORT FIX
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log("Server running on port " + PORT);
+  console.log("✅ Server running on port " + PORT);
 });
