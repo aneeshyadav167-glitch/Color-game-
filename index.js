@@ -3,19 +3,12 @@ const TelegramBot = require("node-telegram-bot-api");
 
 const app = express();
 
-// 🔑 YOUR DATA (already added)
+// 🔑 DATA
 const TOKEN = "8728782119:AAEjJ8ILVExhS3WeA8M4jxs8i_mcGL2AJ-4";
 const ADMIN_ID = 6008064617;
 
-// 🌐 URL auto
-const URL = process.env.RENDER_EXTERNAL_URL || "";
-
-const bot = new TelegramBot(TOKEN);
-
-// 🔥 webhook auto
-if (URL) {
-  bot.setWebHook(URL);
-}
+// ✅ POLLING (NO WEBHOOK)
+const bot = new TelegramBot(TOKEN, { polling: true });
 
 // 📊 DATA
 let users = {};
@@ -34,7 +27,7 @@ bot.onText(/\/start/, (msg) => {
   bot.sendMessage(id, `🎮 Welcome!\n💰 Points: ${users[id].points}`);
 });
 
-// 🔑 ADMIN PANEL
+// 🔑 ADMIN
 bot.onText(/\/admin/, (msg) => {
   if (msg.chat.id != ADMIN_ID) return;
 
@@ -51,7 +44,7 @@ bot.onText(/\/admin/, (msg) => {
   );
 });
 
-// 🎮 START GAME + UI
+// 🎮 START GAME (FIXED)
 bot.onText(/\/startgame (.+)/, (msg, match) => {
   if (msg.chat.id != ADMIN_ID) return;
 
@@ -72,7 +65,7 @@ bot.onText(/\/startgame (.+)/, (msg, match) => {
   bets = [];
   bettingOpen = true;
 
-  let keyboard = {
+  const keyboard = {
     reply_markup: {
       inline_keyboard: [
         [
@@ -83,30 +76,36 @@ bot.onText(/\/startgame (.+)/, (msg, match) => {
         [
           { text: "0", callback_data: "0" },
           { text: "1", callback_data: "1" },
-          { text: "2", callback_data: "2" }
-        ],
-        [
+          { text: "2", callback_data: "2" },
           { text: "3", callback_data: "3" },
-          { text: "4", callback_data: "4" },
-          { text: "5", callback_data: "5" }
+          { text: "4", callback_data: "4" }
         ],
         [
+          { text: "5", callback_data: "5" },
           { text: "6", callback_data: "6" },
           { text: "7", callback_data: "7" },
-          { text: "8", callback_data: "8" }
-        ],
-        [
+          { text: "8", callback_data: "8" },
           { text: "9", callback_data: "9" }
         ],
         [
-          { text: "⬆️ Up", callback_data: "up" },
-          { text: "⬇️ Down", callback_data: "down" }
+          { text: "⬆️ UP", callback_data: "up" },
+          { text: "⬇️ DOWN", callback_data: "down" }
         ]
       ]
     }
   };
 
-  bot.sendMessage(msg.chat.id, `🎮 ${input} Round Started!\nChoose your bet 👇`, keyboard);
+  // 🔥 SEND TO ALL USERS
+  Object.keys(users).forEach((uid) => {
+    bot.sendMessage(
+      uid,
+      `🎮 *${input} Round Started!*\n\nChoose your bet 👇`,
+      {
+        parse_mode: "Markdown",
+        ...keyboard
+      }
+    );
+  });
 
   let t = timeMap[input];
 
@@ -122,20 +121,20 @@ bot.onText(/\/startgame (.+)/, (msg, match) => {
   }, 1000);
 });
 
-// 🎯 BUTTON BET
+// 🎯 BUTTON CLICK
 bot.on("callback_query", (query) => {
   let choice = query.data;
   let userId = query.message.chat.id;
 
   if (!bettingOpen) {
-    bot.answerCallbackQuery(query.id, { text: "⛔ Betting closed!" });
+    bot.answerCallbackQuery(query.id, { text: "⛔ Closed!" });
     return;
   }
 
   bets.push({ user: userId, choice });
 
   bot.answerCallbackQuery(query.id, {
-    text: `✅ Bet on ${choice}`
+    text: `✅ ${choice}`
   });
 });
 
@@ -181,12 +180,14 @@ function endRound() {
   Object.keys(users).forEach((uid) => {
     bot.sendMessage(
       uid,
-      `🎯 Result:
-Number: ${result.number}
-Color: ${result.color}
-Up/Down: ${result.updown}
+      `🎯 *RESULT*
 
-💰 Points: ${users[uid].points}`
+🎲 Number: ${result.number}
+🎨 Color: ${result.color}
+📈 ${result.updown.toUpperCase()}
+
+💰 Points: ${users[uid].points}`,
+      { parse_mode: "Markdown" }
     );
   });
 }
@@ -203,19 +204,8 @@ bot.onText(/\/stats/, (msg) => {
   bot.sendMessage(msg.chat.id, JSON.stringify(s, null, 2));
 });
 
-// 🌐 SERVER
-app.use(express.json());
+// 🌐 SERVER (Render ke liye)
+app.get("/", (req, res) => res.send("Bot Running"));
 
-app.post("/", (req, res) => {
-  bot.processUpdate(req.body);
-  res.sendStatus(200);
-});
-
-app.get("/", (req, res) => res.send("Bot Running ✅"));
-
-// 🔥 PORT FIX
 const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-  console.log("✅ Server running on port " + PORT);
-});
+app.listen(PORT, () => console.log("Running"));
