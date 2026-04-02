@@ -4,8 +4,8 @@ const TelegramBot = require("node-telegram-bot-api");
 const app = express();
 
 // 🔑 DATA
-const TOKEN = "8728782119:AAEjJ8ILVExhS3WeA8M4jxs8i_mcGL2AJ-4";
-const ADMIN_ID = 6008064617;
+const TOKEN = "M4jxs8i_mcGL2AJ-4";
+const ADMIN_ID = ;
 
 // ✅ POLLING (NO WEBHOOK)
 const bot = new TelegramBot(TOKEN, { polling: true });
